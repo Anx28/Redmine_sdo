@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: redmine_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redmine:
+    image: redmine:latest
+    container_name: redmine_app
+    restart: always
+    depends_on:
+      - db
+    environment:
+      REDMINE_DB_MYSQL: db
+      REDMINE_DB_DATABASE: ${MYSQL_DATABASE}
+      REDMINE_DB_USERNAME: ${MYSQL_USER}
+      REDMINE_DB_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3000:3000"
+    volumes:
+      - redmine_data:/usr/src/redmine/files
+      - redmine_plugins:/usr/src/redmine/plugins
+      - ./database.yml:/usr/src/redmine/config/database.yml
+
+  nginx:
+    image: nginx:latest
+    container_name: redmine_nginx
+    restart: always
+    depends_on:
+      - redmine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+
+  certbot:
+    image: certbot/certbot
+    container_name: redmine_certbot
+    depends_on:
+      - nginx
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 1; done'"
+
+volumes:
+  db_data:
+  redmine_data:
+  redmine_plugins:
